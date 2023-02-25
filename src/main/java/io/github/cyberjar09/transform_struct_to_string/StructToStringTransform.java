@@ -30,6 +30,13 @@ public class StructToStringTransform<R extends ConnectRecord<R>> implements Tran
 
     @Override
     public R apply(R record) {
+        System.out.println("record >>> " + record);
+        System.out.println("record.key >>> " + record.key());
+        System.out.println("record.keySchema >>> " + record.keySchema());
+        System.out.println("record.value >>> " + record.value());
+        System.out.println("record.valueSchema >>> " + record.valueSchema());
+        System.out.println("record.valueSchema.fields >>> " + record.valueSchema().fields());
+
         Struct value = (Struct) record.value();
 
         value.schema().fields().forEach(f -> {
