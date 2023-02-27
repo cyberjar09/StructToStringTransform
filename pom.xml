@@ -6,7 +6,7 @@
 
     <groupId>io.github.cyberjar09.transform_struct_to_string</groupId>
     <artifactId>StructToStringTransform</artifactId>
-    <version>0.0.2-SNAPSHOT</version>
+    <version>0.0.3-SNAPSHOT</version>
 
     <properties>
         <maven.compiler.source>16</maven.compiler.source>
@@ -51,6 +51,12 @@
             <artifactId>kafka-streams</artifactId>
             <version>${kafkaconnect.version}</version>
             <scope>provided</scope>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-databind -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.14.2</version>
         </dependency>
     </dependencies>
 

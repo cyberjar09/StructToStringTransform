@@ -1,18 +1,31 @@
 package io.github.cyberjar09.transform_struct_to_string;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.connect.connector.ConnectRecord;
-import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.transforms.Transformation;
+import org.apache.kafka.connect.transforms.util.SimpleConfig;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.*;
 
 public class StructToStringTransform<R extends ConnectRecord<R>> implements Transformation<R> {
+
+    private static final String EXCLUDE_FIELDS_CONFIG = "fields.exclude";
+    private static final ConfigDef CONFIG_DEF = new ConfigDef()
+            .define(EXCLUDE_FIELDS_CONFIG, ConfigDef.Type.LIST, ConfigDef.NO_DEFAULT_VALUE, ConfigDef.Importance.HIGH,
+                    "List of top level field names to exclude from conversion to JSON strings");
+
+    private List<String> fieldNamesToExcludeFromTransform;
+
+    @Override
+    public void configure(Map<String, ?> configs) {
+        final SimpleConfig config = new SimpleConfig(CONFIG_DEF, configs);
+        fieldNamesToExcludeFromTransform = config.getList(EXCLUDE_FIELDS_CONFIG);
+    }
+
     @Override
     public ConfigDef config() {
         return new ConfigDef();
@@ -24,48 +37,66 @@ public class StructToStringTransform<R extends ConnectRecord<R>> implements Tran
     }
 
     @Override
-    public void configure(Map<String, ?> configs) {
-        // No configuration required
-    }
-
-    @Override
     public R apply(R record) {
-        System.out.println("record >>> " + record);
-        System.out.println("record.key >>> " + record.key());
-        System.out.println("record.keySchema >>> " + record.keySchema());
-        System.out.println("record.value >>> " + record.value());
-        System.out.println("record.valueSchema >>> " + record.valueSchema());
-        System.out.println("record.valueSchema.fields >>> " + record.valueSchema().fields());
+        /**
+         * used for debugging
+         *
+         * System.out.println("record >>> " + record);
+         * System.out.println("record.valueSchema.fields >>> " + record.valueSchema().fields());
+         */
 
-        Struct value = (Struct) record.value();
+        Object objectValue = record.value();
+        if (objectValue instanceof Struct) {
+            final Struct value = (Struct) objectValue;
+            final Schema valueSchema = record.valueSchema();
 
-        value.schema().fields().forEach(f -> {
-            List nonPrimitiveTypes = Arrays.asList(Schema.Type.STRUCT, Schema.Type.ARRAY, Schema.Type.MAP);
-            if (nonPrimitiveTypes.contains(f.schema().type())){
-                Struct fieldValue = value.getStruct(f.name());
-                Struct transformedFieldValue = getJsonStruct(fieldValue);
-                value.put(f, transformedFieldValue);
-            }
-        });
-        return record.newRecord(record.topic(), record.kafkaPartition(), record.keySchema(), record.key(), record.valueSchema(), value, record.timestamp());
-    }
+            final Map<String, Object> updatedValue = new HashMap<>();
+            final Map<String, Schema> updatedSchema = new HashMap<>();
 
-    private Struct getJsonStruct(Struct struct) {
-        Struct jsonStruct = new Struct(struct.schema());
-        for (Field field : struct.schema().fields()) {
-            Object fieldValue = struct.get(field);
-            if (fieldValue instanceof Struct) {
-                fieldValue = toJsonString((Struct) fieldValue);
-            }
-            jsonStruct.put(field.name(), fieldValue);
+            valueSchema.fields().forEach(field -> {
+                final String fieldName = field.name();
+                final Schema fieldSchema = field.schema();
+                final Object fieldValue = value.get(fieldName);
+
+                updatedSchema.put(fieldName, fieldSchema);
+                if (fieldValue == null) {
+                    updatedValue.put(fieldName, null);
+                } else if (fieldSchema.type().isPrimitive()) {
+                    updatedValue.put(fieldName, fieldValue);
+                } else if (fieldNamesToExcludeFromTransform != null && fieldNamesToExcludeFromTransform.contains(fieldName)){
+                    updatedValue.put(fieldName, fieldValue);
+                } else {
+                    String jsonString = null;
+                    try {
+                        updatedSchema.put(fieldName, Schema.STRING_SCHEMA);
+                        jsonString = JsonUtils.toJsonString(fieldValue);
+                    } catch (JsonProcessingException e) {
+                        throw new RuntimeException(e);
+                    }
+                    updatedValue.put(fieldName, jsonString);
+                }
+            });
+
+            SchemaBuilder resultSchemaBuilder = SchemaBuilder.struct().name("JsonValue");
+            updatedSchema.forEach((fieldName, fieldSchema) -> {
+                resultSchemaBuilder.field(fieldName, fieldSchema);
+            });
+            Schema resultSchema = resultSchemaBuilder.build();
+
+            Struct resultValue = new Struct(resultSchema);
+
+            updatedValue.forEach((k, v) -> {
+                resultValue.put(k, v);
+            });
+
+            return record.newRecord(record.topic(), record.kafkaPartition(),
+                    record.keySchema(), record.key(),
+                    resultSchema,
+                    resultValue,
+                    record.timestamp());
+        } else {
+            return record;
         }
-        return jsonStruct;
-    }
-
-    private String toJsonString(Struct struct) {
-        return struct.schema().fields().stream()
-                .map(field -> "\"" + field.name() + "\":" + struct.get(field))
-                .collect(Collectors.joining(",", "{", "}"));
     }
 }
 
