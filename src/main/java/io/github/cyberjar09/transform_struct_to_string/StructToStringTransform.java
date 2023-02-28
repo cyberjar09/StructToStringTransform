@@ -59,7 +59,7 @@ public class StructToStringTransform<R extends ConnectRecord<R>> implements Tran
 
                 updatedSchema.put(fieldName, fieldSchema);
                 if (fieldValue == null) {
-                    updatedValue.put(fieldName, null);
+                    updatedSchema.remove(fieldName);
                 } else if (fieldSchema.type().isPrimitive()) {
                     updatedValue.put(fieldName, fieldValue);
                 } else if (fieldNamesToExcludeFromTransform != null && fieldNamesToExcludeFromTransform.contains(fieldName)){
@@ -107,8 +107,12 @@ public class StructToStringTransform<R extends ConnectRecord<R>> implements Tran
             System.out.println("-------");
             System.out.println(recordName + " >>> " + record);
             System.out.println(recordName + ".valueSchema.fields >>> " + record.valueSchema().fields());
-            System.out.println(recordName + ".valueSchema.defaultValue >>> " + record.valueSchema().defaultValue());
+            record.valueSchema().fields().forEach(f -> {
+                System.out.println(">>> Field: " + f.name() + " -> isOptional:" + f.schema().isOptional());
+            });
             System.out.println(recordName + ".valueSchema.name >>> " + record.valueSchema().name());
+            System.out.println(recordName + ".valueSchema.isOptional >>> " + record.valueSchema().isOptional());
+            System.out.println(recordName + ".valueSchema.defaultValue >>> " + record.valueSchema().defaultValue());
             System.out.println(recordName + ".valueSchema.version >>> " + record.valueSchema().version());
             System.out.println(recordName + ".valueSchema.doc >>> " + record.valueSchema().doc());
             System.out.println(recordName + ".valueSchema.parameters >>> " + record.valueSchema().parameters());

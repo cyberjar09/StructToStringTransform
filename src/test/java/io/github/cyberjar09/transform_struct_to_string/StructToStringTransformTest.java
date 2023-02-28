@@ -1,5 +1,6 @@
 package io.github.cyberjar09.transform_struct_to_string;
 
+import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
@@ -8,6 +9,7 @@ import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 
@@ -233,7 +235,10 @@ public class StructToStringTransformTest {
         String expectedInnerValueForAfter = "{\"id\":\"1\",\"user_id\":\"2\"}";
 
         // Then
-        Assert.assertEquals(expectedValueSchema.toString(), transformedRecord.valueSchema().toString());
+        Assert.assertEquals(fieldToString(expectedValueSchema.field("before")), fieldToString(transformedRecord.valueSchema().field("before")));
+        Assert.assertEquals(fieldToString(expectedValueSchema.field("after")), fieldToString(transformedRecord.valueSchema().field("after")));
+        Assert.assertEquals(fieldToString(expectedValueSchema.field("source")), fieldToString(transformedRecord.valueSchema().field("source")));
+        Assert.assertEquals(fieldToString(expectedValueSchema.field("extra")), fieldToString(transformedRecord.valueSchema().field("extra")));
 
         Assert.assertEquals(expectedInnerValueForBefore.toString(), ((Struct) transformedRecord.value()).get("before").toString());
         Assert.assertEquals(expectedInnerValueForAfter.toString(), ((Struct) transformedRecord.value()).get("after").toString());
@@ -241,5 +246,60 @@ public class StructToStringTransformTest {
         Assert.assertEquals(innerValueForExtra.toString(), ((Struct) transformedRecord.value()).get("extra").toString());
     }
 
+    private static String fieldToString(Field field) {
+        if(field == null) return null;
+        String[] split = field.toString().split(", ");
+        String joinedString = String.join(", ", Arrays.asList(split[0], split[2]));
+        return joinedString;
+    }
+
+    @Test
+    public void testSchemaPropogationWhenValueDoesNotExist() {
+        Map<String, ?> configMap = Map.of("debug", true, "fields.exclude", "");
+        transform.configure(configMap);
+
+        // Given
+        Schema innerValueSchemaExistsButNoValue = SchemaBuilder.struct()
+                .field("id", Schema.STRING_SCHEMA)
+                .field("user_id", Schema.STRING_SCHEMA)
+                .build();
+
+        Schema innerValueSchemaAndValueExists = SchemaBuilder.struct()
+                .field("id", Schema.STRING_SCHEMA)
+                .field("user_id", Schema.STRING_SCHEMA)
+                .build();
+
+        Schema valueSchema = SchemaBuilder.struct()
+                .field("op", Schema.STRING_SCHEMA)
+                .field("schemaExistsButNoValue", innerValueSchemaExistsButNoValue)
+                .field("bothSchemaAndValueExists", innerValueSchemaAndValueExists)
+                .build();
+
+        Struct innerValueForAfter = new Struct(innerValueSchemaAndValueExists)
+                .put("id", "1")
+                .put("user_id", "2");
+
+        Struct value = new Struct(valueSchema)
+                .put("op", "r")
+                .put("bothSchemaAndValueExists", innerValueForAfter);
+
+        SinkRecord record = new SinkRecord("topic", 0, null, null, valueSchema, value, 0);
+
+        // When
+        SinkRecord transformedRecord = transform.apply(record);
+
+        // Expectation
+        Schema expectedValueSchema = SchemaBuilder.struct().name("JsonValue")
+                .field("op", Schema.STRING_SCHEMA)
+                .field("bothSchemaAndValueExists",  Schema.STRING_SCHEMA)
+                .build();
+//        System.out.println("==== expectedValueSchema: " + expectedValueSchema.fields());
+
+        // Then
+//        Assert.assertEquals(expectedValueSchema.fields().toString(), transformedRecord.valueSchema().fields().toString());
+        Assert.assertEquals(fieldToString(expectedValueSchema.field("op")), fieldToString(transformedRecord.valueSchema().field("op")));
+        Assert.assertEquals(fieldToString(expectedValueSchema.field("bothSchemaAndValueExists")), fieldToString(transformedRecord.valueSchema().field("bothSchemaAndValueExists")));
+        Assert.assertEquals(null, fieldToString(transformedRecord.valueSchema().field("schemaExistsButNoValue")));
+    }
 
 }

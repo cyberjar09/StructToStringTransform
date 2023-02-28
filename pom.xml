@@ -6,7 +6,7 @@
 
     <groupId>io.github.cyberjar09.transform_struct_to_string</groupId>
     <artifactId>StructToStringTransform</artifactId>
-    <version>0.0.6</version>
+    <version>0.0.7</version>
 
     <properties>
         <maven.compiler.source>16</maven.compiler.source>
