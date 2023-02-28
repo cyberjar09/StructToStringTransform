@@ -14,16 +14,20 @@ import java.util.*;
 public class StructToStringTransform<R extends ConnectRecord<R>> implements Transformation<R> {
 
     private static final String EXCLUDE_FIELDS_CONFIG = "fields.exclude";
+    private static final String DEBUG = "debug";
     private static final ConfigDef CONFIG_DEF = new ConfigDef()
             .define(EXCLUDE_FIELDS_CONFIG, ConfigDef.Type.LIST, Collections.emptyList(), ConfigDef.Importance.HIGH,
-                    "List of top level field names to exclude from conversion to JSON strings");
+                    "List of top level field names to exclude from conversion to JSON strings")
+            .define(DEBUG, ConfigDef.Type.BOOLEAN, false, ConfigDef.Importance.LOW, "Show debug output of records");
 
     private List<String> fieldNamesToExcludeFromTransform;
+    private boolean isDebugModeEnabled;
 
     @Override
     public void configure(Map<String, ?> configs) {
         final SimpleConfig config = new SimpleConfig(CONFIG_DEF, configs);
         fieldNamesToExcludeFromTransform = config.getList(EXCLUDE_FIELDS_CONFIG);
+        isDebugModeEnabled = config.getBoolean(DEBUG);
     }
 
     @Override
@@ -38,12 +42,7 @@ public class StructToStringTransform<R extends ConnectRecord<R>> implements Tran
 
     @Override
     public R apply(R record) {
-        /**
-         * used for debugging
-         *
-         * System.out.println("record >>> " + record);
-         * System.out.println("record.valueSchema.fields >>> " + record.valueSchema().fields());
-         */
+        printRecordForDebugging(record, "inputRecord");
 
         Object objectValue = record.value();
         if (objectValue instanceof Struct) {
@@ -89,13 +88,31 @@ public class StructToStringTransform<R extends ConnectRecord<R>> implements Tran
                 resultValue.put(k, v);
             });
 
-            return record.newRecord(record.topic(), record.kafkaPartition(),
+            R newRecord = record.newRecord(record.topic(), record.kafkaPartition(),
                     record.keySchema(), record.key(),
                     resultSchema,
                     resultValue,
                     record.timestamp());
+
+            printRecordForDebugging(newRecord, "newRecord");
+
+            return newRecord;
         } else {
             return record;
+        }
+    }
+
+    private void printRecordForDebugging(R record, String recordName) {
+        if (isDebugModeEnabled) {
+            System.out.println("-------");
+            System.out.println(recordName + " >>> " + record);
+            System.out.println(recordName + ".valueSchema.fields >>> " + record.valueSchema().fields());
+            System.out.println(recordName + ".valueSchema.defaultValue >>> " + record.valueSchema().defaultValue());
+            System.out.println(recordName + ".valueSchema.name >>> " + record.valueSchema().name());
+            System.out.println(recordName + ".valueSchema.version >>> " + record.valueSchema().version());
+            System.out.println(recordName + ".valueSchema.doc >>> " + record.valueSchema().doc());
+            System.out.println(recordName + ".valueSchema.parameters >>> " + record.valueSchema().parameters());
+            System.out.println("-------");
         }
     }
 }

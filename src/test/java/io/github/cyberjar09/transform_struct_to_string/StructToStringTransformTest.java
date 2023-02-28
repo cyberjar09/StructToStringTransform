@@ -9,6 +9,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
+import java.util.Map;
 
 public class StructToStringTransformTest {
 
@@ -160,7 +161,8 @@ public class StructToStringTransformTest {
 
     @Test
     public void testNestedStructWithFieldName() {
-        transform.configure(Collections.singletonMap("fields.exclude", "source, extra"));
+        Map<String, ?> configMap = Map.of("debug", false, "fields.exclude", "source, extra");
+        transform.configure(configMap);
         // Given
         Schema innerValueSchemaForSource = SchemaBuilder.struct()
                 .field("schema", Schema.STRING_SCHEMA)
