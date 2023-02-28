@@ -15,7 +15,7 @@ public class StructToStringTransform<R extends ConnectRecord<R>> implements Tran
 
     private static final String EXCLUDE_FIELDS_CONFIG = "fields.exclude";
     private static final ConfigDef CONFIG_DEF = new ConfigDef()
-            .define(EXCLUDE_FIELDS_CONFIG, ConfigDef.Type.LIST, ConfigDef.NO_DEFAULT_VALUE, ConfigDef.Importance.HIGH,
+            .define(EXCLUDE_FIELDS_CONFIG, ConfigDef.Type.LIST, Collections.emptyList(), ConfigDef.Importance.HIGH,
                     "List of top level field names to exclude from conversion to JSON strings");
 
     private List<String> fieldNamesToExcludeFromTransform;
